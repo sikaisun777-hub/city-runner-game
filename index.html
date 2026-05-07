@@ -420,12 +420,12 @@
       if (typeRoll > 0.9) type = 'lowbar';
 
       const lane = lanes[Math.floor(Math.random() * lanes.length)];
-      const z = H + 80;
+      const z = -90;
       objects.push({ type, lane, z, hit: false });
 
       if (Math.random() < 0.32) {
         const otherLane = lanes.filter(l => l !== lane)[Math.floor(Math.random() * 2)];
-        objects.push({ type: Math.random() < 0.5 ? 'barrier' : 'cone', lane: otherLane, z: H + 120, hit: false });
+        objects.push({ type: Math.random() < 0.5 ? 'barrier' : 'cone', lane: otherLane, z: -150, hit: false });
       }
     }
 
@@ -433,14 +433,14 @@
       const lane = lanes[Math.floor(Math.random() * lanes.length)];
       const count = 5 + Math.floor(Math.random() * 5);
       for (let i = 0; i < count; i++) {
-        objects.push({ type: 'coin', lane, z: H + 60 + i * 62, hit: false, bob: Math.random() * 10 });
+        objects.push({ type: 'coin', lane, z: -80 - i * 62, hit: false, bob: Math.random() * 10 });
       }
     }
 
     function spawnPowerup() {
       const lane = lanes[Math.floor(Math.random() * lanes.length)];
       const type = Math.random() < 0.5 ? 'magnet' : 'shield';
-      objects.push({ type, lane, z: H + 80, hit: false });
+      objects.push({ type, lane, z: -90, hit: false });
     }
 
     function moveLeft() {
@@ -513,7 +513,7 @@
 
       for (let i = objects.length - 1; i >= 0; i--) {
         const obj = objects[i];
-        obj.z -= speed * dt60;
+        obj.z += speed * dt60;
 
         if (obj.type === 'coin' && magnetTime > 0) {
           const objX = laneToX(obj.lane);
@@ -528,7 +528,7 @@
           handleCollision(obj);
         }
 
-        if (obj.z < -120 || obj.hit) {
+        if (obj.z > H + 160 || obj.hit) {
           objects.splice(i, 1);
         }
       }
@@ -737,7 +737,7 @@
       const sorted = [...objects].sort((a, b) => a.z - b.z);
       for (const obj of sorted) {
         const p = projectPoint(obj.lane, obj.z);
-        if (p.y < H * 0.2 || p.y > H + 80) continue;
+        if (p.y < H * 0.2 || p.y > H + 120) continue;
         if (obj.type === 'coin') drawCoin(p, obj);
         else if (obj.type === 'magnet') drawPower(p, '磁', COLORS.magnet);
         else if (obj.type === 'shield') drawPower(p, '盾', COLORS.shield);
