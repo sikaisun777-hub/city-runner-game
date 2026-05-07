@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>星尘跑酷：像素致敬版</title>
+  <title>星尘跑酷</title>
   <style>
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
@@ -145,9 +145,10 @@ const dialogueLine = document.getElementById('dialogueLine');
 
 let W=0,H=0,dpr=1,running=false,lastTime=0,gameOver=false;
 let score=0,coins=0,speed=7,distance=0;
-let spawnTimer=0,coinTimer=0,powerTimer=0,shakeTime=0,flashTime=0,magnetTime=0,shieldTime=0;
+let spawnTimer=0,coinTimer=0,powerTimer=0,shakeTime=0,flashTime=0,magnetTime=0,shieldTime=0,giantTime=0;
 let phase='run', bossType='emerald', bossTime=0, bossCooldown=1100, bossAttackTimer=0;
 let objects=[], particles=[], speedLines=[], warnings=[], deathAnim=null;
+let keyboardCrouchHeld = false;
 const lanes=[-1,0,1];
 const player={lane:0,laneX:0,y:0,baseY:0,vy:0,jumping:false,rolling:false,rollTime:0,dead:false};
 let dialogueTimeout=null;
@@ -166,9 +167,9 @@ function showDialogue(speaker,line,duration=1800){dialogueSpeaker.textContent=sp
 function showBossBanner(text){bossBanner.textContent=text;bossBanner.classList.remove('show');void bossBanner.offsetWidth;bossBanner.classList.add('show')}
 function updateHud(){scoreEl.textContent=Math.floor(score);coinEl.textContent=coins;speedEl.textContent=(speed/7).toFixed(1)+'x';phaseEl.textContent=phase==='boss'?(bossType==='emerald'?'绿弹幕':'飞刀战'):(phase==='death'?'倒地中':'跑酷')}
 function resetGame(){
-  running=false;gameOver=false;score=0;coins=0;speed=7;distance=0;spawnTimer=260;coinTimer=420;powerTimer=2600;shakeTime=0;flashTime=0;magnetTime=0;shieldTime=0;
+  running=false;gameOver=false;score=0;coins=0;speed=7;distance=0;spawnTimer=260;coinTimer=420;powerTimer=2600;shakeTime=0;flashTime=0;magnetTime=0;shieldTime=0;giantTime=0;
   phase='run';bossType='emerald';bossTime=0;bossCooldown=1000;bossAttackTimer=0;objects=[];particles=[];speedLines=[];warnings=[];deathAnim=null;
-  player.lane=0;player.laneX=0;player.y=player.baseY;player.vy=0;player.jumping=false;player.rolling=false;player.rollTime=0;player.dead=false;updateHud();
+  player.lane=0;player.laneX=0;player.y=player.baseY;player.vy=0;player.jumping=false;player.rolling=false;player.rollTime=0;player.dead=false;keyboardCrouchHeld=false;updateHud();
 }
 function startGame(){resetGame();running=true;overlay.style.display='none';lastTime=performance.now();requestAnimationFrame(loop)}
 function showHome(){overlay.innerHTML=`<div class="card"><h1>星尘跑酷</h1><p>像素风帽子长风衣主角，Boss 有绿宝石弹幕和飞刀战。所有刀阵都会留生路。</p><p>电脑：方向键 / WASD　手机：左右上下滑动</p><div class="btn-row"><button id="startBtn2">开始游戏</button></div></div>`;overlay.style.display='grid';document.getElementById('startBtn2').addEventListener('click',startGame)}
@@ -180,7 +181,11 @@ function spawnObstacle(){
   if(Math.random()<.22){const lane2=pick(lanes.filter(l=>l!==lane));objects.push({type:Math.random()<.55?'barrier':'cone',lane:lane2,z:H+255,hit:false})}
 }
 function spawnCoinLine(){const lane=pick(lanes),count=5+Math.floor(Math.random()*4);for(let i=0;i<count;i++)objects.push({type:'coin',lane,z:H+100+i*65,hit:false,bob:Math.random()*10})}
-function spawnPowerup(){objects.push({type:Math.random()<.5?'magnet':'shield',lane:pick(lanes),z:H+150,hit:false})}
+function spawnPowerup(){
+  const r=Math.random();
+  const type = r < .34 ? 'magnet' : (r < .68 ? 'shield' : 'ruby');
+  objects.push({type,lane:pick(lanes),z:H+150,hit:false})
+}
 function startBoss(type){
   phase='boss';bossType=type;bossTime=0;bossAttackTimer=90;objects=objects.filter(o=>o.type==='coin'||o.type==='magnet'||o.type==='shield');warnings=[];
   if(type==='emerald'){showBossBanner('EMERALD!');showToast('Boss：绿宝石弹幕');showDialogue('绿宝石替身','半径二十米的绿色风暴！',2200)}
@@ -205,7 +210,19 @@ function spawnKnifeSafeWave(){
 function moveLeft(){if(running&&!player.dead)player.lane=Math.max(-1,player.lane-1)}
 function moveRight(){if(running&&!player.dead)player.lane=Math.min(1,player.lane+1)}
 function jump(){if(running&&!player.dead&&!player.jumping&&!player.rolling){player.vy=-16.5;player.jumping=true;showDialogue('冷面跑者','オラ！',650)}}
-function roll(){if(running&&!player.dead&&!player.jumping){player.rolling=true;player.rollTime=.55}}
+function roll(){
+  // 手机端：下滑后短暂蹲下/滑铲
+  if(running&&!player.dead&&!player.jumping){player.rolling=true;player.rollTime=.55}
+}
+function startHoldCrouch(){
+  // 电脑端：按住下键/S 才持续蹲下
+  if(running&&!player.dead&&!player.jumping){keyboardCrouchHeld=true;player.rolling=true;player.rollTime=9999}
+}
+function stopHoldCrouch(){
+  // 电脑端：松开下键/S 立刻站起来
+  keyboardCrouchHeld=false;
+  if(player.rolling && player.rollTime>1000){player.rolling=false;player.rollTime=0}
+}
 function triggerDeath(kind){
   if(player.dead)return;if(shieldTime>0){shieldTime=0;shakeTime=.25;flashTime=.14;showToast('护盾抵消撞击！');showDialogue('冷面跑者','还没结束。',1100);return}
   player.dead=true;phase='death';const x=laneToX(player.laneX),y=player.y;
@@ -214,7 +231,7 @@ function triggerDeath(kind){
 }
 function checkCollision(obj){
   const p=project(obj.lane,obj.z), laneClose=Math.abs(obj.lane-player.laneX)<.42, zClose=Math.abs(p.y-player.y)<60;if(!laneClose||!zClose)return false;
-  if(obj.type==='coin'||obj.type==='magnet'||obj.type==='shield')return true;
+  if(obj.type==='coin'||obj.type==='magnet'||obj.type==='shield'||obj.type==='ruby')return true;
   if(obj.type==='lowbar')return !player.rolling;if(obj.type==='barrier'||obj.type==='cone')return !player.jumping;if(obj.type==='knife'||obj.type==='emerald'||obj.type==='train')return true;return false;
 }
 function handleCollision(obj){
@@ -222,6 +239,17 @@ function handleCollision(obj){
   if(obj.type==='coin'){obj.hit=true;coins++;score+=25;burst(p.x,p.y,'#ffd95e');return}
   if(obj.type==='magnet'){obj.hit=true;magnetTime=8;showToast('磁铁启动！');showDialogue('冷面跑者','金币，过来。',1200);burst(p.x,p.y,'#7cfff2');return}
   if(obj.type==='shield'){obj.hit=true;shieldTime=8;showToast('护盾启动！');showDialogue('冷面跑者','防御展开。',1200);burst(p.x,p.y,'#a6ff7c');return}
+  if(obj.type==='ruby'){obj.hit=true;giantTime=8;showToast('红宝石无敌启动！');showDialogue('冷面跑者','现在，轮到我直接碾过去了。',1600);burst(p.x,p.y,'#ff4d5a');return}
+  if(giantTime>0){
+    obj.hit=true;
+    let bonus=60;
+    if(obj.type==='train') bonus=180;
+    else if(obj.type==='knife'||obj.type==='emerald') bonus=90;
+    score+=bonus;
+    burst(p.x,p.y,'#ff5a66');
+    showToast('无敌冲撞！');
+    return;
+  }
   obj.hit=true;triggerDeath(obj.type==='train'?'train':'trip')
 }
 function burst(x,y,color){for(let i=0;i<16;i++)particles.push({x,y,vx:Math.cos(i/16*Math.PI*2)*rand(2,5),vy:Math.sin(i/16*Math.PI*2)*rand(2,5),life:rand(.35,.7),color})}
@@ -229,10 +257,13 @@ function burst(x,y,color){for(let i=0;i<16;i++)particles.push({x,y,vx:Math.cos(i
 function update(dt){
   const dt60=dt*60;shakeTime=Math.max(0,shakeTime-dt);flashTime=Math.max(0,flashTime-dt);
   if(player.dead&&deathAnim){deathAnim.t+=dt;deathAnim.x+=deathAnim.vx*dt60;deathAnim.y+=deathAnim.vy*dt60;deathAnim.vy+=.9*dt60;deathAnim.rot+=deathAnim.spin*dt60;updateParticles(dt,dt60);if(deathAnim.t>1.2)endGame();return}
-  speed=Math.min(18,speed+dt*.13);distance+=speed*dt60;score+=speed*dt*6.2;magnetTime=Math.max(0,magnetTime-dt);shieldTime=Math.max(0,shieldTime-dt);
+  speed=Math.min(18,speed+dt*.13);distance+=speed*dt60;score+=speed*dt*6.2;magnetTime=Math.max(0,magnetTime-dt);shieldTime=Math.max(0,shieldTime-dt);giantTime=Math.max(0,giantTime-dt);
   player.laneX+=(player.lane-player.laneX)*Math.min(1,dt*13);
   if(player.jumping){player.y+=player.vy*dt60;player.vy+=.72*dt60;if(player.y>=player.baseY){player.y=player.baseY;player.vy=0;player.jumping=false}}
-  if(player.rolling){player.rollTime-=dt;if(player.rollTime<=0)player.rolling=false}
+  if(player.rolling){
+    if(keyboardCrouchHeld){player.rollTime=9999}
+    else {player.rollTime-=dt;if(player.rollTime<=0)player.rolling=false}
+  }
   if(phase==='run'){
     maybeStartBoss();spawnTimer-=dt60*speed;coinTimer-=dt60*speed;powerTimer-=dt60*speed;
     if(spawnTimer<=0){spawnObstacle();spawnTimer=650+Math.random()*520-speed*22} if(coinTimer<=0){spawnCoinLine();coinTimer=700+Math.random()*760} if(powerTimer<=0){spawnPowerup();powerTimer=3400+Math.random()*3200}
@@ -258,7 +289,7 @@ function drawLaneLines(){ctx.setLineDash([12,18]);ctx.lineDashOffset=-distance*.
 function drawTunnelLights(){for(let z=H+90-(distance%120);z>-80;z-=120){const p=project(0,z);ctx.fillStyle=`rgba(255,214,94,${.12+p.p*.35})`;ctx.beginPath();ctx.ellipse(W*.12,p.y,18*p.scale,6*p.scale,0,0,Math.PI*2);ctx.ellipse(W*.88,p.y,18*p.scale,6*p.scale,0,0,Math.PI*2);ctx.fill()}}
 function drawBoss(){if(phase!=='boss')return;const x=W/2,y=H*.16+Math.sin(bossTime*4)*8;ctx.save();ctx.translate(x,y);ctx.globalAlpha=.95;ctx.fillStyle=bossType==='emerald'?'rgba(70,255,150,.18)':'rgba(255,216,95,.18)';ctx.beginPath();ctx.arc(0,0,76,0,Math.PI*2);ctx.fill();ctx.strokeStyle=bossType==='emerald'?'#62ff9f':'#ffd25e';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,0,60+Math.sin(bossTime*7)*5,0,Math.PI*2);ctx.stroke();ctx.fillStyle='#161022';roundRect(ctx,-38,-52,76,104,24);ctx.fill();ctx.fillStyle=bossType==='emerald'?'#62ff9f':'#ffd25e';ctx.font='900 28px system-ui';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(bossType==='emerald'?'绿':'刀',0,0);ctx.fillStyle='rgba(255,255,255,.85)';ctx.font='900 12px system-ui';ctx.fillText('BOSS',0,42);ctx.restore()}
 function drawWarnings(){for(const w of warnings){const p=project(w.lane,w.z);if(p.y<H*.18||p.y>H+80)continue;ctx.save();ctx.globalAlpha=Math.max(0,w.life/.9)*.75;ctx.fillStyle=w.color;ctx.beginPath();ctx.ellipse(p.x,p.y,38*p.scale,16*p.scale,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,255,255,.9)';ctx.font=`900 ${14*p.scale}px system-ui`;ctx.textAlign='center';ctx.fillText('危险',p.x,p.y+4*p.scale);ctx.restore()}}
-function drawObjects(){const sorted=[...objects].sort((a,b)=>b.z-a.z);for(const obj of sorted){const p=project(obj.lane,obj.z);if(p.y<H*.18||p.y>H+120)continue;if(obj.type==='coin')drawCoin(p,obj);else if(obj.type==='magnet')drawPower(p,'磁','#7cfff2');else if(obj.type==='shield')drawPower(p,'盾','#a6ff7c');else if(obj.type==='train')drawTrain(p);else if(obj.type==='lowbar')drawLowbar(p);else if(obj.type==='emerald')drawEmerald(p);else if(obj.type==='knife')drawKnife(p);else drawBarrier(p,obj.type==='cone')}}
+function drawObjects(){const sorted=[...objects].sort((a,b)=>b.z-a.z);for(const obj of sorted){const p=project(obj.lane,obj.z);if(p.y<H*.18||p.y>H+120)continue;if(obj.type==='coin')drawCoin(p,obj);else if(obj.type==='magnet')drawPower(p,'磁','#7cfff2');else if(obj.type==='shield')drawPower(p,'盾','#a6ff7c');else if(obj.type==='ruby')drawRuby(p);else if(obj.type==='train')drawTrain(p);else if(obj.type==='lowbar')drawLowbar(p);else if(obj.type==='emerald')drawEmerald(p);else if(obj.type==='knife')drawKnife(p);else drawBarrier(p,obj.type==='cone')}}
 function drawCoin(p,o){const r=13*p.scale,b=Math.sin((distance+o.bob)*.08)*5*p.scale;ctx.save();ctx.translate(p.x,p.y+b);ctx.fillStyle='#ffd95e';ctx.beginPath();ctx.ellipse(0,0,r*.7,r,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='rgba(255,255,255,.7)';ctx.lineWidth=2*p.scale;ctx.stroke();ctx.fillStyle='rgba(80,50,0,.28)';ctx.fillRect(-r*.12,-r*.55,r*.24,r*1.1);ctx.restore()}
 function drawPower(p,label,color){const s=38*p.scale;ctx.save();ctx.translate(p.x,p.y);ctx.shadowColor=color;ctx.shadowBlur=18*p.scale;ctx.fillStyle=color;roundRect(ctx,-s/2,-s/2,s,s,12*p.scale);ctx.fill();ctx.shadowBlur=0;ctx.fillStyle='#07101d';ctx.font=`900 ${17*p.scale}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,0,1);ctx.restore()}
 function drawBarrier(p,cone=false){const w=58*p.scale,h=42*p.scale;ctx.save();ctx.translate(p.x,p.y);if(cone){ctx.fillStyle='#ff8f2c';ctx.beginPath();ctx.moveTo(0,-h*.75);ctx.lineTo(w*.45,h*.45);ctx.lineTo(-w*.45,h*.45);ctx.closePath();ctx.fill();ctx.fillStyle='rgba(255,255,255,.75)';ctx.fillRect(-w*.28,h*.02,w*.56,h*.12)}else{ctx.fillStyle='#ffb13b';ctx.fillRect(-w/2,-h/2,w,h);ctx.fillStyle='rgba(80,38,0,.35)';ctx.fillRect(-w/2,-h*.08,w,h*.16);ctx.fillStyle='rgba(255,255,255,.55)';ctx.fillRect(-w*.35,-h*.34,w*.7,h*.16)}ctx.restore()}
@@ -266,8 +297,19 @@ function drawLowbar(p){const w=86*p.scale,h=70*p.scale;ctx.save();ctx.translate(
 function drawTrain(p){const w=88*p.scale,h=136*p.scale;ctx.save();ctx.translate(p.x,p.y-h*.18);ctx.fillStyle='#8d2036';roundRect(ctx,-w/2,-h/2,w,h,12*p.scale);ctx.fill();ctx.fillStyle='#ea5064';roundRect(ctx,-w*.43,-h*.43,w*.86,h*.86,10*p.scale);ctx.fill();ctx.fillStyle='rgba(160,240,255,.76)';ctx.fillRect(-w*.3,-h*.3,w*.6,h*.22);ctx.fillStyle='#ffd25e';ctx.beginPath();ctx.arc(-w*.25,h*.32,6*p.scale,0,Math.PI*2);ctx.arc(w*.25,h*.32,6*p.scale,0,Math.PI*2);ctx.fill();ctx.restore()}
 function drawEmerald(p){const r=22*p.scale;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(distance*.025);ctx.shadowColor='#62ff9f';ctx.shadowBlur=18*p.scale;ctx.fillStyle='#62ff9f';ctx.beginPath();ctx.moveTo(0,-r);ctx.lineTo(r*.9,-r*.2);ctx.lineTo(r*.55,r);ctx.lineTo(-r*.55,r);ctx.lineTo(-r*.9,-r*.2);ctx.closePath();ctx.fill();ctx.strokeStyle='white';ctx.lineWidth=2*p.scale;ctx.stroke();ctx.restore()}
 function drawKnife(p){const s=44*p.scale;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(-.45);ctx.fillStyle='#dfe8ff';ctx.beginPath();ctx.moveTo(-s*.55,-s*.12);ctx.lineTo(s*.35,-s*.12);ctx.lineTo(s*.65,0);ctx.lineTo(s*.35,s*.12);ctx.lineTo(-s*.55,s*.12);ctx.closePath();ctx.fill();ctx.fillStyle='#43255f';ctx.fillRect(-s*.78,-s*.17,s*.25,s*.34);ctx.restore()}
+function drawRuby(p){const r=24*p.scale;ctx.save();ctx.translate(p.x,p.y);ctx.rotate(distance*.03);ctx.shadowColor='#ff4d5a';ctx.shadowBlur=20*p.scale;ctx.fillStyle='#ff4d5a';ctx.beginPath();ctx.moveTo(0,-r);ctx.lineTo(r*.82,-r*.18);ctx.lineTo(r*.55,r);ctx.lineTo(-r*.55,r);ctx.lineTo(-r*.82,-r*.18);ctx.closePath();ctx.fill();ctx.shadowBlur=0;ctx.strokeStyle='rgba(255,255,255,.85)';ctx.lineWidth=2*p.scale;ctx.stroke();ctx.fillStyle='rgba(255,255,255,.9)';ctx.font=`900 ${12*p.scale}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('无敌',0,2*p.scale);ctx.restore()}
 
-function drawPlayer(){if(player.dead&&deathAnim){drawDeathPlayer();return}const x=laneToX(player.laneX),y=player.y,scale=player.rolling?.72:1;ctx.save();ctx.translate(x,y);if(shieldTime>0){ctx.strokeStyle='rgba(166,255,124,.8)';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,-35,38,0,Math.PI*2);ctx.stroke()}if(magnetTime>0){ctx.strokeStyle='rgba(124,255,242,.45)';ctx.lineWidth=3;ctx.setLineDash([8,8]);ctx.beginPath();ctx.arc(0,-35,50,0,Math.PI*2);ctx.stroke();ctx.setLineDash([])}ctx.scale(1,scale);drawPixelHero(0,0);ctx.restore()}
+function drawPlayer(){
+  if(player.dead&&deathAnim){drawDeathPlayer();return}
+  const x=laneToX(player.laneX),y=player.y;
+  const crouchScale=player.rolling?.72:1;
+  const giantScale=giantTime>0?1.65:1;
+  ctx.save();ctx.translate(x,y);
+  if(shieldTime>0){ctx.strokeStyle='rgba(166,255,124,.8)';ctx.lineWidth=4;ctx.beginPath();ctx.arc(0,-35,38*giantScale,0,Math.PI*2);ctx.stroke()}
+  if(magnetTime>0){ctx.strokeStyle='rgba(124,255,242,.45)';ctx.lineWidth=3;ctx.setLineDash([8,8]);ctx.beginPath();ctx.arc(0,-35,50*giantScale,0,Math.PI*2);ctx.stroke();ctx.setLineDash([])}
+  if(giantTime>0){ctx.strokeStyle='rgba(255,77,90,.9)';ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,-40,52*giantScale,0,Math.PI*2);ctx.stroke();ctx.fillStyle='rgba(255,77,90,.16)';ctx.beginPath();ctx.arc(0,-40,52*giantScale,0,Math.PI*2);ctx.fill()}
+  ctx.scale(giantScale,giantScale*crouchScale);drawPixelHero(0,0);ctx.restore()
+}
 function drawDeathPlayer(){const d=deathAnim;ctx.save();ctx.translate(d.x,d.y);ctx.rotate(d.rot*Math.PI/180);ctx.globalAlpha=Math.max(.25,1-d.t*.35);drawPixelHero(0,0);ctx.restore()}
 function rect(x,y,w,h,c){ctx.fillStyle=c;ctx.fillRect(x,y,w,h)}
 function drawPixelHero(cx,cy){
@@ -284,12 +326,22 @@ function drawPixelHero(cx,cy){
 }
 function drawParticles(){for(const p of particles){ctx.globalAlpha=Math.max(0,p.life/.7);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
 function drawSpeedLines(){ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=2;for(const l of speedLines){ctx.globalAlpha=Math.max(0,l.life/.28);ctx.beginPath();ctx.moveTo(l.x,l.y);ctx.lineTo(l.x-l.len*.25,l.y+l.len);ctx.stroke()}ctx.globalAlpha=1}
-function drawPowerBars(){let y=64;if(magnetTime>0){drawBar('磁铁',magnetTime/8,'#7cfff2',y);y+=20}if(shieldTime>0){drawBar('护盾',shieldTime/8,'#a6ff7c',y);y+=20}if(phase==='boss')drawBar('BOSS',1-bossTime/16,bossType==='emerald'?'#62ff9f':'#ffd25e',y)}
+function drawPowerBars(){let y=64;if(magnetTime>0){drawBar('磁铁',magnetTime/8,'#7cfff2',y);y+=20}if(shieldTime>0){drawBar('护盾',shieldTime/8,'#a6ff7c',y);y+=20}if(giantTime>0){drawBar('无敌',giantTime/8,'#ff4d5a',y);y+=20}if(phase==='boss')drawBar('BOSS',1-bossTime/16,bossType==='emerald'?'#62ff9f':'#ffd25e',y)}
 function drawBar(label,pct,color,y){const x=16,w=112;ctx.fillStyle='rgba(255,255,255,.15)';roundRect(ctx,x,y,w,11,999);ctx.fill();ctx.fillStyle=color;roundRect(ctx,x,y,w*Math.max(0,Math.min(1,pct)),11,999);ctx.fill();ctx.fillStyle='rgba(255,255,255,.86)';ctx.font='900 11px system-ui';ctx.fillText(label,x+w+8,y+10)}
 function roundRect(ctx,x,y,w,h,r){const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath()}
 function loop(now){if(!running)return;const dt=Math.min((now-lastTime)/1000,.033);lastTime=now;update(dt);draw();requestAnimationFrame(loop)}
 
-window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();if(k==='arrowleft'||k==='a')moveLeft();if(k==='arrowright'||k==='d')moveRight();if(k==='arrowup'||k==='w'||k===' ')jump();if(k==='arrowdown'||k==='s')roll()});
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowleft'||k==='a')moveLeft();
+  if(k==='arrowright'||k==='d')moveRight();
+  if(k==='arrowup'||k==='w'||k===' ')jump();
+  if(k==='arrowdown'||k==='s')startHoldCrouch();
+});
+window.addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='arrowdown'||k==='s')stopHoldCrouch();
+});
 let startX=0,startY=0;wrap.addEventListener('pointerdown',e=>{startX=e.clientX;startY=e.clientY});wrap.addEventListener('pointerup',e=>{const dx=e.clientX-startX,dy=e.clientY-startY,ax=Math.abs(dx),ay=Math.abs(dy);if(Math.max(ax,ay)<24)return;if(ax>ay)dx<0?moveLeft():moveRight();else dy<0?jump():roll()});
 window.addEventListener('resize',resize);startBtn.addEventListener('click',startGame);resize();draw();
 </script>
