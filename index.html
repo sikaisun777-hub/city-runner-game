@@ -168,7 +168,7 @@ function showBossBanner(text){bossBanner.textContent=text;bossBanner.classList.r
 function updateHud(){scoreEl.textContent=Math.floor(score);coinEl.textContent=coins;speedEl.textContent=(speed/7).toFixed(1)+'x';phaseEl.textContent=phase==='boss'?(bossType==='emerald'?'绿弹幕':'飞刀战'):(phase==='death'?'倒地中':'跑酷')}
 function resetGame(){
   running=false;gameOver=false;score=0;coins=0;speed=7;distance=0;spawnTimer=260;coinTimer=420;powerTimer=2600;shakeTime=0;flashTime=0;magnetTime=0;shieldTime=0;giantTime=0;
-  phase='run';bossType='emerald';bossTime=0;bossCooldown=1000;bossAttackTimer=0;objects=[];particles=[];speedLines=[];warnings=[];deathAnim=null;
+  phase='run';bossType='emerald';bossTime=0;bossCooldown=2200;bossAttackTimer=0;objects=[];particles=[];speedLines=[];warnings=[];deathAnim=null;
   player.lane=0;player.laneX=0;player.y=player.baseY;player.vy=0;player.jumping=false;player.rolling=false;player.rollTime=0;player.dead=false;keyboardCrouchHeld=false;updateHud();
 }
 function startGame(){resetGame();running=true;overlay.style.display='none';lastTime=performance.now();requestAnimationFrame(loop)}
@@ -183,7 +183,8 @@ function spawnObstacle(){
 function spawnCoinLine(){const lane=pick(lanes),count=5+Math.floor(Math.random()*4);for(let i=0;i<count;i++)objects.push({type:'coin',lane,z:H+100+i*65,hit:false,bob:Math.random()*10})}
 function spawnPowerup(){
   const r=Math.random();
-  const type = r < .34 ? 'magnet' : (r < .68 ? 'shield' : 'ruby');
+  // 红宝石调到 35%，磁铁和护盾分别约 32.5%。
+  const type = r < .325 ? 'magnet' : (r < .65 ? 'shield' : 'ruby');
   objects.push({type,lane:pick(lanes),z:H+150,hit:false})
 }
 function startBoss(type){
@@ -191,7 +192,15 @@ function startBoss(type){
   if(type==='emerald'){showBossBanner('EMERALD!');showToast('Boss：绿宝石弹幕');showDialogue('绿宝石替身','半径二十米的绿色风暴！',2200)}
   else{showBossBanner('KNIVES!');showToast('Boss：飞刀风暴');showDialogue('金色恶影','无駄无駄！飞刀会封两道。',2200)}
 }
-function maybeStartBoss(){if(phase!=='run')return;bossCooldown-=speed;if(score>500&&bossCooldown<=0){startBoss(Math.random()<.5?'emerald':'knife');bossCooldown=1700+Math.random()*1000}}
+function maybeStartBoss(){
+  if(phase!=='run')return;
+  // Boss 触发降低频率：分数更高才开始，冷却也更长。
+  bossCooldown-=speed;
+  if(score>1200&&bossCooldown<=0){
+    startBoss(Math.random()<.5?'emerald':'knife');
+    bossCooldown=4200+Math.random()*1800;
+  }
+}
 function addWarning(lane,z,color,kind){warnings.push({lane,z,color,kind,life:.9})}
 
 function spawnEmeraldSafeWave(){
@@ -266,12 +275,12 @@ function update(dt){
   }
   if(phase==='run'){
     maybeStartBoss();spawnTimer-=dt60*speed;coinTimer-=dt60*speed;powerTimer-=dt60*speed;
-    if(spawnTimer<=0){spawnObstacle();spawnTimer=650+Math.random()*520-speed*22} if(coinTimer<=0){spawnCoinLine();coinTimer=700+Math.random()*760} if(powerTimer<=0){spawnPowerup();powerTimer=3400+Math.random()*3200}
+    if(spawnTimer<=0){spawnObstacle();spawnTimer=650+Math.random()*520-speed*22} if(coinTimer<=0){spawnCoinLine();coinTimer=700+Math.random()*760} if(powerTimer<=0){spawnPowerup();powerTimer=1700+Math.random()*1400}
   } else if(phase==='boss'){
     bossTime+=dt;bossAttackTimer-=dt60*speed;
     if(bossAttackTimer<=0){bossType==='emerald'?spawnEmeraldSafeWave():spawnKnifeSafeWave();bossAttackTimer=bossType==='emerald'?520+Math.random()*180:560+Math.random()*190}
     // Boss 战暂时不刷金币，避免把安全路线视觉弄乱。
-    if(bossTime>16){phase='run';showToast('Boss 退场！');showDialogue('冷面跑者','继续前进。',1200)}
+    if(bossTime>12){phase='run';showToast('Boss 退场！');showDialogue('冷面跑者','继续前进。',1200)}
   }
   for(let i=objects.length-1;i>=0;i--){const obj=objects[i], objSpeed=(obj.type==='emerald'||obj.type==='knife')?speed*1.05:speed;obj.z-=objSpeed*dt60;if(obj.type==='coin'&&magnetTime>0){const p=project(obj.lane,obj.z),px=laneToX(player.laneX);if(Math.abs(p.y-player.y)<260&&Math.abs(p.x-px)<W*.38){obj.lane+=(player.laneX-obj.lane)*.16;obj.z+=(player.y-p.y)*.12}}if(!obj.hit&&checkCollision(obj))handleCollision(obj);if(obj.z<-180||obj.hit)objects.splice(i,1)}
   for(let i=warnings.length-1;i>=0;i--){warnings[i].life-=dt;warnings[i].z-=speed*1.05*dt60;if(warnings[i].life<=0||warnings[i].z<-100)warnings.splice(i,1)}
@@ -326,7 +335,7 @@ function drawPixelHero(cx,cy){
 }
 function drawParticles(){for(const p of particles){ctx.globalAlpha=Math.max(0,p.life/.7);ctx.fillStyle=p.color;ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill()}ctx.globalAlpha=1}
 function drawSpeedLines(){ctx.strokeStyle='rgba(255,255,255,.16)';ctx.lineWidth=2;for(const l of speedLines){ctx.globalAlpha=Math.max(0,l.life/.28);ctx.beginPath();ctx.moveTo(l.x,l.y);ctx.lineTo(l.x-l.len*.25,l.y+l.len);ctx.stroke()}ctx.globalAlpha=1}
-function drawPowerBars(){let y=64;if(magnetTime>0){drawBar('磁铁',magnetTime/8,'#7cfff2',y);y+=20}if(shieldTime>0){drawBar('护盾',shieldTime/8,'#a6ff7c',y);y+=20}if(giantTime>0){drawBar('无敌',giantTime/8,'#ff4d5a',y);y+=20}if(phase==='boss')drawBar('BOSS',1-bossTime/16,bossType==='emerald'?'#62ff9f':'#ffd25e',y)}
+function drawPowerBars(){let y=64;if(magnetTime>0){drawBar('磁铁',magnetTime/8,'#7cfff2',y);y+=20}if(shieldTime>0){drawBar('护盾',shieldTime/8,'#a6ff7c',y);y+=20}if(giantTime>0){drawBar('无敌',giantTime/8,'#ff4d5a',y);y+=20}if(phase==='boss')drawBar('BOSS',1-bossTime/12,bossType==='emerald'?'#62ff9f':'#ffd25e',y)}
 function drawBar(label,pct,color,y){const x=16,w=112;ctx.fillStyle='rgba(255,255,255,.15)';roundRect(ctx,x,y,w,11,999);ctx.fill();ctx.fillStyle=color;roundRect(ctx,x,y,w*Math.max(0,Math.min(1,pct)),11,999);ctx.fill();ctx.fillStyle='rgba(255,255,255,.86)';ctx.font='900 11px system-ui';ctx.fillText(label,x+w+8,y+10)}
 function roundRect(ctx,x,y,w,h,r){const rr=Math.min(r,w/2,h/2);ctx.beginPath();ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath()}
 function loop(now){if(!running)return;const dt=Math.min((now-lastTime)/1000,.033);lastTime=now;update(dt);draw();requestAnimationFrame(loop)}
@@ -347,4 +356,3 @@ window.addEventListener('resize',resize);startBtn.addEventListener('click',start
 </script>
 </body>
 </html>
-
