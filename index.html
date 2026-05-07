@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>城市跑酷</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      margin: 0;
+      width: 100%;
+      min-height: 100%;
+      overflow: hidden;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #07111f;
+      color: white;
+      user-select: none;
+    }
+
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 18% 18%, rgba(70, 211, 255, .18), transparent 26%),
+        radial-gradient(circle at 85% 10%, rgba(255, 196, 72, .15), transparent 26%),
+        linear-gradient(160deg, #0c1b32, #07111f 55%, #030712);
+    }
+
+    .game-wrap {
+      position: relative;
+      width: min(96vw, 520px);
+      height: min(96vh, 820px);
+      height: min(96dvh, 820px);
+      min-height: 560px;
+      overflow: hidden;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,.22);
+      background: linear-gradient(#172f58 0%, #0d1d37 44%, #07111f 100%);
+      box-shadow: 0 28px 90px rgba(0,0,0,.55);
+      touch-action: none;
+    }
+
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .hud {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      top: 12px;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .badge {
+      padding: 9px 8px;
+      border-radius: 16px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.2);
+      backdrop-filter: blur(10px);
+      text-align: center;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+    }
+
+    .badge small {
+      display: block;
+      color: rgba(255,255,255,.72);
+      font-size: 11px;
+      margin-bottom: 2px;
+    }
+
+    .badge strong {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      display: grid;
+      place-items: center;
+      padding: 22px;
+      background: rgba(4, 8, 20, .64);
+      backdrop-filter: blur(8px);
+    }
+
+    .card {
+      width: min(94%, 420px);
+      text-align: center;
+      padding: 26px 22px;
+      border-radius: 28px;
+      background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.25);
+      box-shadow: 0 24px 80px rgba(0,0,0,.42);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(36px, 9vw, 56px);
+      letter-spacing: 2px;
+      text-shadow: 0 8px 28px rgba(0,0,0,.4);
+    }
+
+    .card p {
+      margin: 10px auto 18px;
+      color: rgba(255,255,255,.84);
+      line-height: 1.65;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 13px 22px;
+      font-size: 16px;
+      font-weight: 900;
+      cursor: pointer;
+      color: #07111f;
+      background: linear-gradient(90deg, #6ff7ff, #fff3a8, #ffd25e);
+      box-shadow: 0 12px 34px rgba(255, 210, 94, .25);
+    }
+
+    .secondary {
+      color: white;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.24);
+      box-shadow: none;
+    }
+
+    .controls {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      z-index: 6;
+      display: none;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .control-key {
+      padding: 10px 6px;
+      text-align: center;
+      border-radius: 15px;
+      background: rgba(255,255,255,.11);
+      border: 1px solid rgba(255,255,255,.18);
+      color: rgba(255,255,255,.78);
+      font-weight: 800;
+      font-size: 12px;
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      top: 88px;
+      z-index: 7;
+      transform: translateX(-50%);
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.16);
+      border: 1px solid rgba(255,255,255,.24);
+      backdrop-filter: blur(12px);
+      font-weight: 900;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .toast.show { animation: toastShow 1s ease-out forwards; }
+
+    @keyframes toastShow {
+      0% { opacity: 0; transform: translate(-50%, -10px); }
+      20% { opacity: 1; transform: translate(-50%, 0); }
+      80% { opacity: 1; transform: translate(-50%, 0); }
+      100% { opacity: 0; transform: translate(-50%, -10px); }
+    }
+
+    @media (max-width: 560px) {
+      .game-wrap {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        min-height: 0;
+        border-radius: 0;
+        border: 0;
+      }
+
+      .hud {
+        left: 8px;
+        right: 8px;
+        top: 8px;
+        gap: 5px;
+      }
+
+      .badge {
+        padding: 7px 4px;
+        border-radius: 13px;
+      }
+
+      .badge small { font-size: 10px; }
+      .badge strong { font-size: 17px; }
+      .controls { display: grid; }
+      .card { padding: 22px 18px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="game-wrap" id="gameWrap">
+    <canvas id="gameCanvas"></canvas>
+
+    <section class="hud">
+      <div class="badge"><small>分数</small><strong id="scoreEl">0</strong></div>
+      <div class="badge"><small>金币</small><strong id="coinEl">0</strong></div>
+      <div class="badge"><small>速度</small><strong id="speedEl">1x</strong></div>
+    </section>
+
+    <div class="toast" id="toast">护盾启动！</div>
+
+    <section class="controls" aria-hidden="true">
+      <div class="control-key">← 左</div>
+      <div class="control-key">→ 右</div>
+      <div class="control-key">↑ 跳</div>
+      <div class="control-key">↓ 滑</div>
+    </section>
+
+    <section class="overlay" id="overlay">
+      <div class="card">
+        <h1>城市跑酷</h1>
+        <p>类似地铁跑酷的三赛道跑酷小游戏。左右换道，上滑跳跃，下滑翻滚，躲开路障和列车，收集金币和道具。</p>
+        <p>电脑：方向键 / WASD<br>手机：上下左右滑动</p>
+        <div class="btn-row">
+          <button id="startBtn">开始游戏</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const wrap = document.getElementById('gameWrap');
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('startBtn');
+    const scoreEl = document.getElementById('scoreEl');
+    const coinEl = document.getElementById('coinEl');
+    const speedEl = document.getElementById('speedEl');
+    const toast = document.getElementById('toast');
+
+    let W = 0;
+    let H = 0;
+    let dpr = 1;
+    let running = false;
+    let gameOver = false;
+    let lastTime = 0;
+    let score = 0;
+    let coins = 0;
+    let speed = 7;
+    let distance = 0;
+    let spawnTimer = 0;
+    let coinTimer = 0;
+    let powerTimer = 0;
+    let shakeTime = 0;
+    let magnetTime = 0;
+    let shieldTime = 0;
+    let objects = [];
+    let particles = [];
+
+    const lanes = [-1, 0, 1];
+    const player = {
+      lane: 0,
+      laneX: 0,
+      y: 0,
+      baseY: 0,
+      w: 46,
+      h: 76,
+      vy: 0,
+      jumping: false,
+      rolling: false,
+      rollTime: 0,
+      alive: true
+    };
+
+    const COLORS = {
+      road: '#25324b',
+      road2: '#182238',
+      line: 'rgba(255,255,255,.32)',
+      sky: '#14284b',
+      train: '#e6505f',
+      trainDark: '#9d2434',
+      barrier: '#ffb13b',
+      coin: '#ffd85e',
+      magnet: '#7cf7ff',
+      shield: '#a6ff7c'
+    };
+
+    function resize() {
+      const r = wrap.getBoundingClientRect();
+      dpr = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+      W = Math.floor(r.width);
+      H = Math.floor(r.height);
+      canvas.width = Math.floor(W * dpr);
+      canvas.height = Math.floor(H * dpr);
+      canvas.style.width = W + 'px';
+      canvas.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      player.baseY = H - 118;
+      player.y = player.jumping ? player.y : player.baseY;
+      player.w = Math.max(38, Math.min(52, W * 0.1));
+      player.h = player.w * 1.65;
+    }
+
+    function laneToX(lane) {
+      const roadWidth = W * 0.78;
+      const laneGap = roadWidth / 3;
+      return W / 2 + lane * laneGap;
+    }
+
+    function resetGame() {
+      score = 0;
+      coins = 0;
+      speed = 7;
+      distance = 0;
+      spawnTimer = 0;
+      coinTimer = 0;
+      powerTimer = 0;
+      shakeTime = 0;
+      magnetTime = 0;
+      shieldTime = 0;
+      objects = [];
+      particles = [];
+      gameOver = false;
+      player.lane = 0;
+      player.laneX = 0;
+      player.y = player.baseY;
+      player.vy = 0;
+      player.jumping = false;
+      player.rolling = false;
+      player.rollTime = 0;
+      player.alive = true;
+      updateHud();
+    }
+
+    function updateHud() {
+      scoreEl.textContent = Math.floor(score);
+      coinEl.textContent = coins;
+      speedEl.textContent = (speed / 7).toFixed(1) + 'x';
+    }
+
+    function showToast(text) {
+      toast.textContent = text;
+      toast.classList.remove('show');
+      void toast.offsetWidth;
+      toast.classList.add('show');
+    }
+
+    function startGame() {
+      resetGame();
+      running = true;
+      overlay.style.display = 'none';
+      lastTime = performance.now();
+      requestAnimationFrame(loop);
+    }
+
+    function endGame() {
+      if (gameOver) return;
+      gameOver = true;
+      running = false;
+      overlay.innerHTML = `
+        <div class="card">
+          <h1>游戏结束</h1>
+          <p>分数：<strong>${Math.floor(score)}</strong><br>金币：<strong>${coins}</strong></p>
+          <div class="btn-row">
+            <button id="againBtn">再玩一次</button>
+            <button class="secondary" id="homeBtn">回到首页</button>
+          </div>
+        </div>
+      `;
+      overlay.style.display = 'grid';
+      document.getElementById('againBtn').addEventListener('click', startGame);
+      document.getElementById('homeBtn').addEventListener('click', showHome);
+    }
+
+    function showHome() {
+      overlay.innerHTML = `
+        <div class="card">
+          <h1>城市跑酷</h1>
+          <p>左右换道，上滑跳跃，下滑翻滚。躲开路障和列车，收集金币和道具。</p>
+          <p>电脑：方向键 / WASD<br>手机：上下左右滑动</p>
+          <div class="btn-row">
+            <button id="startBtn2">开始游戏</button>
+          </div>
+        </div>
+      `;
+      overlay.style.display = 'grid';
+      document.getElementById('startBtn2').addEventListener('click', startGame);
+    }
+
+    function spawnObstacle() {
+      const typeRoll = Math.random();
+      let type = 'barrier';
+      if (typeRoll > 0.68) type = 'train';
+      if (typeRoll > 0.9) type = 'lowbar';
+
+      const lane = lanes[Math.floor(Math.random() * lanes.length)];
+      const z = H + 80;
+      objects.push({ type, lane, z, hit: false });
+
+      if (Math.random() < 0.32) {
+        const otherLane = lanes.filter(l => l !== lane)[Math.floor(Math.random() * 2)];
+        objects.push({ type: Math.random() < 0.5 ? 'barrier' : 'cone', lane: otherLane, z: H + 120, hit: false });
+      }
+    }
+
+    function spawnCoinLine() {
+      const lane = lanes[Math.floor(Math.random() * lanes.length)];
+      const count = 5 + Math.floor(Math.random() * 5);
+      for (let i = 0; i < count; i++) {
+        objects.push({ type: 'coin', lane, z: H + 60 + i * 62, hit: false, bob: Math.random() * 10 });
+      }
+    }
+
+    function spawnPowerup() {
+      const lane = lanes[Math.floor(Math.random() * lanes.length)];
+      const type = Math.random() < 0.5 ? 'magnet' : 'shield';
+      objects.push({ type, lane, z: H + 80, hit: false });
+    }
+
+    function moveLeft() {
+      if (!running) return;
+      player.lane = Math.max(-1, player.lane - 1);
+    }
+
+    function moveRight() {
+      if (!running) return;
+      player.lane = Math.min(1, player.lane + 1);
+    }
+
+    function jump() {
+      if (!running || player.jumping || player.rolling) return;
+      player.vy = -16;
+      player.jumping = true;
+    }
+
+    function roll() {
+      if (!running || player.jumping) return;
+      player.rolling = true;
+      player.rollTime = 0.55;
+    }
+
+    function update(dt) {
+      const dt60 = dt * 60;
+      speed += dt * 0.12;
+      speed = Math.min(speed, 17);
+      distance += speed * dt60;
+      score += speed * dt * 6;
+      magnetTime = Math.max(0, magnetTime - dt);
+      shieldTime = Math.max(0, shieldTime - dt);
+      shakeTime = Math.max(0, shakeTime - dt);
+
+      player.laneX += (player.lane - player.laneX) * Math.min(1, dt * 13);
+
+      if (player.jumping) {
+        player.y += player.vy * dt60;
+        player.vy += 0.72 * dt60;
+        if (player.y >= player.baseY) {
+          player.y = player.baseY;
+          player.vy = 0;
+          player.jumping = false;
+        }
+      }
+
+      if (player.rolling) {
+        player.rollTime -= dt;
+        if (player.rollTime <= 0) player.rolling = false;
+      }
+
+      spawnTimer -= dt60 * speed;
+      coinTimer -= dt60 * speed;
+      powerTimer -= dt60 * speed;
+
+      if (spawnTimer <= 0) {
+        spawnObstacle();
+        spawnTimer = 650 + Math.random() * 520 - speed * 22;
+      }
+
+      if (coinTimer <= 0) {
+        spawnCoinLine();
+        coinTimer = 680 + Math.random() * 760;
+      }
+
+      if (powerTimer <= 0) {
+        spawnPowerup();
+        powerTimer = 3600 + Math.random() * 3600;
+      }
+
+      for (let i = objects.length - 1; i >= 0; i--) {
+        const obj = objects[i];
+        obj.z -= speed * dt60;
+
+        if (obj.type === 'coin' && magnetTime > 0) {
+          const objX = laneToX(obj.lane);
+          const pX = laneToX(player.laneX);
+          if (Math.abs(obj.z - player.y) < 260 && Math.abs(objX - pX) < W * 0.38) {
+            obj.lane += (player.laneX - obj.lane) * 0.18;
+            obj.z += (player.y - obj.z) * 0.08;
+          }
+        }
+
+        if (!obj.hit && checkCollision(obj)) {
+          handleCollision(obj);
+        }
+
+        if (obj.z < -120 || obj.hit) {
+          objects.splice(i, 1);
+        }
+      }
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx * dt60;
+        p.y += p.vy * dt60;
+        p.life -= dt;
+        if (p.life <= 0) particles.splice(i, 1);
+      }
+
+      updateHud();
+    }
+
+    function checkCollision(obj) {
+      const playerLaneClose = Math.abs(obj.lane - player.laneX) < 0.42;
+      const zClose = Math.abs(obj.z - player.y) < 46;
+      if (!playerLaneClose || !zClose) return false;
+
+      if (obj.type === 'coin' || obj.type === 'magnet' || obj.type === 'shield') return true;
+      if (obj.type === 'lowbar') return !player.rolling;
+      if (obj.type === 'barrier' || obj.type === 'cone') return !player.jumping;
+      if (obj.type === 'train') return true;
+      return false;
+    }
+
+    function handleCollision(obj) {
+      if (obj.type === 'coin') {
+        obj.hit = true;
+        coins += 1;
+        score += 25;
+        burst(laneToX(obj.lane), obj.z, COLORS.coin);
+        return;
+      }
+
+      if (obj.type === 'magnet') {
+        obj.hit = true;
+        magnetTime = 8;
+        showToast('磁铁启动！');
+        burst(laneToX(obj.lane), obj.z, COLORS.magnet);
+        return;
+      }
+
+      if (obj.type === 'shield') {
+        obj.hit = true;
+        shieldTime = 8;
+        showToast('护盾启动！');
+        burst(laneToX(obj.lane), obj.z, COLORS.shield);
+        return;
+      }
+
+      if (shieldTime > 0) {
+        obj.hit = true;
+        shieldTime = 0;
+        shakeTime = 0.25;
+        showToast('护盾抵消撞击！');
+        burst(laneToX(obj.lane), obj.z, '#ffffff');
+        return;
+      }
+
+      shakeTime = 0.45;
+      endGame();
+    }
+
+    function burst(x, y, color) {
+      for (let i = 0; i < 14; i++) {
+        particles.push({
+          x, y,
+          vx: Math.cos(i / 14 * Math.PI * 2) * (2 + Math.random() * 3),
+          vy: Math.sin(i / 14 * Math.PI * 2) * (2 + Math.random() * 3),
+          life: 0.45 + Math.random() * 0.25,
+          color
+        });
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      const shakeX = shakeTime > 0 ? (Math.random() - 0.5) * 10 : 0;
+      const shakeY = shakeTime > 0 ? (Math.random() - 0.5) * 8 : 0;
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
+      drawWorld();
+      drawObjects();
+      drawPlayer();
+      drawParticles();
+      drawPowerBars();
+      ctx.restore();
+    }
+
+    function drawWorld() {
+      const horizonY = H * 0.25;
+      const roadTopW = W * 0.24;
+      const roadBotW = W * 1.05;
+      const center = W / 2;
+
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+      skyGrad.addColorStop(0, '#183a6a');
+      skyGrad.addColorStop(0.45, '#102241');
+      skyGrad.addColorStop(1, '#07111f');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      for (let i = 0; i < 18; i++) {
+        const x = (i * 87 + distance * 0.08) % (W + 80) - 40;
+        const y = 35 + (i % 5) * 28;
+        ctx.fillStyle = `rgba(255,255,255,${0.18 + (i % 3) * 0.08})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      drawBuildings(horizonY);
+
+      ctx.beginPath();
+      ctx.moveTo(center - roadTopW / 2, horizonY);
+      ctx.lineTo(center + roadTopW / 2, horizonY);
+      ctx.lineTo(center + roadBotW / 2, H + 40);
+      ctx.lineTo(center - roadBotW / 2, H + 40);
+      ctx.closePath();
+      const roadGrad = ctx.createLinearGradient(0, horizonY, 0, H);
+      roadGrad.addColorStop(0, COLORS.road2);
+      roadGrad.addColorStop(1, COLORS.road);
+      ctx.fillStyle = roadGrad;
+      ctx.fill();
+
+      drawRails(horizonY, roadTopW, roadBotW);
+      drawLaneLines(horizonY, roadTopW, roadBotW);
+    }
+
+    function drawBuildings(horizonY) {
+      for (let side of [-1, 1]) {
+        for (let i = 0; i < 7; i++) {
+          const bw = W * 0.12 + (i % 3) * 10;
+          const bh = 70 + (i * 23) % 90;
+          const x = side < 0 ? i * bw * 0.72 - 20 : W - i * bw * 0.72 - bw + 20;
+          const y = horizonY - bh + 18;
+          ctx.fillStyle = i % 2 ? '#0c1b35' : '#102446';
+          ctx.fillRect(x, y, bw, bh);
+          ctx.fillStyle = 'rgba(255,215,109,.22)';
+          for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 2; c++) {
+              ctx.fillRect(x + 12 + c * 28, y + 14 + r * 20, 8, 9);
+            }
+          }
+        }
+      }
+    }
+
+    function projectPoint(lane, z) {
+      const horizonY = H * 0.25;
+      const t = Math.max(0, Math.min(1, z / H));
+      const perspective = t * t;
+      const laneGapNear = W * 0.26;
+      const laneGapFar = W * 0.055;
+      const laneGap = laneGapFar + (laneGapNear - laneGapFar) * perspective;
+      const x = W / 2 + lane * laneGap;
+      const y = horizonY + (H - horizonY) * perspective;
+      const scale = 0.32 + perspective * 0.95;
+      return { x, y, scale, perspective };
+    }
+
+    function drawRails(horizonY) {
+      for (let lane of [-1, 0, 1]) {
+        for (let rail of [-0.18, 0.18]) {
+          ctx.strokeStyle = 'rgba(125,165,210,.36)';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          const p1 = projectPoint(lane + rail, 0);
+          const p2 = projectPoint(lane + rail, H + 80);
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.stroke();
+        }
+      }
+
+      for (let z = (distance % 80) - 80; z < H + 140; z += 80) {
+        const p = projectPoint(0, z);
+        ctx.strokeStyle = 'rgba(255,255,255,.16)';
+        ctx.lineWidth = 2 + p.scale;
+        ctx.beginPath();
+        ctx.moveTo(W / 2 - W * 0.4 * p.perspective, p.y);
+        ctx.lineTo(W / 2 + W * 0.4 * p.perspective, p.y);
+        ctx.stroke();
+      }
+    }
+
+    function drawLaneLines() {
+      for (let lane of [-0.5, 0.5]) {
+        ctx.strokeStyle = COLORS.line;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([14, 16]);
+        ctx.lineDashOffset = -distance * 0.8;
+        ctx.beginPath();
+        const p1 = projectPoint(lane, 0);
+        const p2 = projectPoint(lane, H + 80);
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    function drawObjects() {
+      const sorted = [...objects].sort((a, b) => a.z - b.z);
+      for (const obj of sorted) {
+        const p = projectPoint(obj.lane, obj.z);
+        if (p.y < H * 0.2 || p.y > H + 80) continue;
+        if (obj.type === 'coin') drawCoin(p, obj);
+        else if (obj.type === 'magnet') drawPower(p, '磁', COLORS.magnet);
+        else if (obj.type === 'shield') drawPower(p, '盾', COLORS.shield);
+        else if (obj.type === 'train') drawTrain(p);
+        else if (obj.type === 'lowbar') drawLowbar(p);
+        else drawBarrier(p, obj.type === 'cone');
+      }
+    }
+
+    function drawCoin(p, obj) {
+      const r = 13 * p.scale;
+      const bob = Math.sin((distance + obj.bob) * 0.08) * 5 * p.scale;
+      ctx.save();
+      ctx.translate(p.x, p.y + bob);
+      ctx.fillStyle = COLORS.coin;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.72, r, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.7)';
+      ctx.lineWidth = 2 * p.scale;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(100,63,0,.28)';
+      ctx.fillRect(-r * .14, -r * .58, r * .28, r * 1.16);
+      ctx.restore();
+    }
+
+    function drawPower(p, label, color) {
+      const s = 38 * p.scale;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 18 * p.scale;
+      ctx.beginPath();
+      ctx.roundRect(-s/2, -s/2, s, s, 12 * p.scale);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#07111f';
+      ctx.font = `900 ${17 * p.scale}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, 0, 1);
+      ctx.restore();
+    }
+
+    function drawBarrier(p, cone = false) {
+      const w = 58 * p.scale;
+      const h = 42 * p.scale;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      if (cone) {
+        ctx.fillStyle = '#ff8f2c';
+        ctx.beginPath();
+        ctx.moveTo(0, -h * .75);
+        ctx.lineTo(w * .45, h * .45);
+        ctx.lineTo(-w * .45, h * .45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255,255,255,.75)';
+        ctx.fillRect(-w*.28, h*.02, w*.56, h*.12);
+      } else {
+        ctx.fillStyle = COLORS.barrier;
+        ctx.fillRect(-w/2, -h/2, w, h);
+        ctx.fillStyle = 'rgba(80,38,0,.35)';
+        ctx.fillRect(-w/2, -h*.08, w, h*.16);
+        ctx.fillStyle = 'rgba(255,255,255,.55)';
+        ctx.fillRect(-w*.35, -h*.34, w*.7, h*.16);
+      }
+      ctx.restore();
+    }
+
+    function drawLowbar(p) {
+      const w = 86 * p.scale;
+      const h = 70 * p.scale;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.strokeStyle = '#ffcc66';
+      ctx.lineWidth = 7 * p.scale;
+      ctx.beginPath();
+      ctx.moveTo(-w/2, h/2);
+      ctx.lineTo(-w/2, -h/2);
+      ctx.lineTo(w/2, -h/2);
+      ctx.lineTo(w/2, h/2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,.75)';
+      ctx.fillRect(-w*.32, -h*.58, w*.64, h*.15);
+      ctx.restore();
+    }
+
+    function drawTrain(p) {
+      const w = 86 * p.scale;
+      const h = 130 * p.scale;
+      ctx.save();
+      ctx.translate(p.x, p.y - h * .18);
+      ctx.fillStyle = COLORS.trainDark;
+      ctx.beginPath();
+      ctx.roundRect(-w/2, -h/2, w, h, 12 * p.scale);
+      ctx.fill();
+      ctx.fillStyle = COLORS.train;
+      ctx.beginPath();
+      ctx.roundRect(-w*.43, -h*.43, w*.86, h*.86, 10 * p.scale);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(160,240,255,.72)';
+      ctx.fillRect(-w*.3, -h*.3, w*.6, h*.22);
+      ctx.fillStyle = '#ffd25e';
+      ctx.beginPath();
+      ctx.arc(-w*.25, h*.32, 6*p.scale, 0, Math.PI*2);
+      ctx.arc(w*.25, h*.32, 6*p.scale, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawPlayer() {
+      const x = laneToX(player.laneX);
+      const y = player.y;
+      const rollScale = player.rolling ? 0.62 : 1;
+      const w = player.w;
+      const h = player.h * rollScale;
+
+      ctx.save();
+      ctx.translate(x, y);
+
+      if (shieldTime > 0) {
+        ctx.strokeStyle = 'rgba(166,255,124,.75)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, -h/2, Math.max(w, h) * .62, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      if (magnetTime > 0) {
+        ctx.strokeStyle = 'rgba(124,247,255,.45)';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 8]);
+        ctx.beginPath();
+        ctx.arc(0, -h/2, Math.max(w, h) * .9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      ctx.fillStyle = '#ffcf5d';
+      ctx.beginPath();
+      ctx.arc(0, -h - 12, w * .28, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#66e2ff';
+      ctx.beginPath();
+      ctx.roundRect(-w/2, -h, w, h * .75, 12);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(-w*.24, -h*.78, w*.16, h*.16);
+      ctx.fillRect(w*.08, -h*.78, w*.16, h*.16);
+
+      ctx.strokeStyle = '#ffd25e';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-w*.42, -h*.55);
+      ctx.lineTo(-w*.72, -h*.28);
+      ctx.moveTo(w*.42, -h*.55);
+      ctx.lineTo(w*.72, -h*.28);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.moveTo(-w*.22, -h*.25);
+      ctx.lineTo(-w*.32, -h*.02);
+      ctx.moveTo(w*.22, -h*.25);
+      ctx.lineTo(w*.32, -h*.02);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawParticles() {
+      for (const p of particles) {
+        ctx.globalAlpha = Math.max(0, p.life / 0.7);
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawPowerBars() {
+      let y = 72;
+      if (magnetTime > 0) {
+        drawBar('磁铁', magnetTime / 8, COLORS.magnet, y);
+        y += 22;
+      }
+      if (shieldTime > 0) {
+        drawBar('护盾', shieldTime / 8, COLORS.shield, y);
+      }
+    }
+
+    function drawBar(label, pct, color, y) {
+      const x = 18;
+      const w = 120;
+      ctx.fillStyle = 'rgba(255,255,255,.16)';
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, 12, 999);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.roundRect(x, y, w * Math.max(0, Math.min(1, pct)), 12, 999);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,.86)';
+      ctx.font = '900 11px system-ui';
+      ctx.fillText(label, x + w + 8, y + 10);
+    }
+
+    function loop(now) {
+      if (!running) return;
+      const dt = Math.min((now - lastTime) / 1000, 0.033);
+      lastTime = now;
+      update(dt);
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('resize', () => {
+      resize();
+      draw();
+    });
+
+    window.addEventListener('keydown', e => {
+      const key = e.key.toLowerCase();
+      if (key === 'arrowleft' || key === 'a') moveLeft();
+      if (key === 'arrowright' || key === 'd') moveRight();
+      if (key === 'arrowup' || key === 'w' || key === ' ') jump();
+      if (key === 'arrowdown' || key === 's') roll();
+    });
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    wrap.addEventListener('pointerdown', e => {
+      touchStartX = e.clientX;
+      touchStartY = e.clientY;
+    });
+
+    wrap.addEventListener('pointerup', e => {
+      const dx = e.clientX - touchStartX;
+      const dy = e.clientY - touchStartY;
+      const absX = Math.abs(dx);
+      const absY = Math.abs(dy);
+      if (Math.max(absX, absY) < 24) return;
+      if (absX > absY) {
+        dx < 0 ? moveLeft() : moveRight();
+      } else {
+        dy < 0 ? jump() : roll();
+      }
+    });
+
+    if (!CanvasRenderingContext2D.prototype.roundRect) {
+      CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+        const rr = Math.min(r, w / 2, h / 2);
+        this.beginPath();
+        this.moveTo(x + rr, y);
+        this.arcTo(x + w, y, x + w, y + h, rr);
+        this.arcTo(x + w, y + h, x, y + h, rr);
+        this.arcTo(x, y + h, x, y, rr);
+        this.arcTo(x, y, x + w, y, rr);
+        this.closePath();
+        return this;
+      };
+    }
+
+    startBtn.addEventListener('click', startGame);
+    resize();
+    draw();
+  </script>
+</body>
+</html>
